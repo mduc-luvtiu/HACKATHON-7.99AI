@@ -135,7 +135,7 @@ export function AuthForm({ onAuth }: AuthFormProps) {
               </div>
 
               {status === "loading" && <div className="text-blue-600 mt-2">Đang xử lý...</div>}
-              {status === "error" && error && <div className="text-red-600 mt-2">{error}</div>}
+              {error && <div className="text-red-600 mt-2">{error}</div>}
 
               <Button type="submit" disabled={isLoading} className="w-full">
                 {isLoading ? (

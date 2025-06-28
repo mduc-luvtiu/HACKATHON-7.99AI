@@ -18,7 +18,6 @@ import {
   Share,
   Smile,
   Camera,
-  Video,
 } from "lucide-react"
 
 export function ChatInterface() {
@@ -186,10 +185,6 @@ export function ChatInterface() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <Badge className="bg-green-500">Online</Badge>
-                  <Button variant="outline" size="sm">
-                    <Video className="w-4 h-4 mr-2" />
-                    Video Call
-                  </Button>
                 </div>
               </div>
             </CardHeader>
