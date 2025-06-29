@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>SenseBot Test</title>
+</head>
+<body>
+    <h2>SenseBot Test Frontend</h2>
+    <div id="chatBox" style="width:100%;max-width:600px;height:300px;overflow-y:auto;border:1px solid #ccc;padding:10px;margin-bottom:10px;"></div>
+    <input type="text" id="messageInput" placeholder="Nhập tin nhắn..." style="width:70%;padding:8px;">
+    <button id="sendBtn">Gửi</button>
+    <button id="videoBtn">Gợi ý video</button>
+    <script>
+    const API_BASE = 'http://localhost:8000';
+    let userId = localStorage.getItem('sensebot_user_id') || ('user_' + Date.now());
+    localStorage.setItem('sensebot_user_id', userId);
+    const chatBox = document.getElementById('chatBox');
+    const messageInput = document.getElementById('messageInput');
+    document.getElementById('sendBtn').onclick = async function() {
+        const msg = messageInput.value.trim();
+        if (!msg) return;
+        chatBox.innerHTML += `<div><b>Bạn:</b> ${msg}</div>`;
+        messageInput.value = '';
+        const res = await fetch(API_BASE + '/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg, user_id: userId })
+        });
+        const data = await res.json();
+        chatBox.innerHTML += `<div><b>Bot:</b> ${data.response}</div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+    };
+    document.getElementById('videoBtn').onclick = async function() {
+        chatBox.innerHTML += `<div><i>Đang lấy gợi ý video...</i></div>`;
+        const res = await fetch(API_BASE + `/api/suggest-videos?user_id=${userId}&emotion=neutral`);
+        const data = await res.json();
+        if (data.videos && data.videos.length > 0) {
+            let html = '<div><b>Video YouTube:</b><ul>';
+            data.videos.forEach(v => {
+                html += `<li><a href="${v.url}" target="_blank">${v.title}</a></li>`;
+            });
+            html += '</ul></div>';
+            chatBox.innerHTML += html;
+        } else {
+            chatBox.innerHTML += '<div>Không tìm thấy video phù hợp.</div>';
+        }
+        chatBox.scrollTop = chatBox.scrollHeight;
+    };
+    </script>
+</body>
+</html> 
