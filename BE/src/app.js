@@ -9,7 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const WebSocket = require('ws');
-
+const migrate = require('./database/migrate');
 // Import routes
 const authRoutes = require('./routes/auth');
 const videoRoutes = require('./routes/videos');
@@ -18,6 +18,9 @@ const chatRoutes = require('./routes/chat');
 
 // Import database
 const database = require('./database/connection');
+
+// Run database migration
+migrate(false);
 
 // Import logger
 const logger = require('./utils/logger');
@@ -83,7 +86,7 @@ const authLimiter = rateLimit({
 
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // 10 uploads per hour
+  max: 9999999999999999, // 10 uploads per hour
   message: {
     success: false,
     message: 'Upload limit exceeded, please try again later.'

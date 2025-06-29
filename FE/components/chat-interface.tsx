@@ -19,6 +19,7 @@ import {
   Smile,
   Camera,
 } from "lucide-react"
+import { MESSAGES } from "@/lib/messages"
 
 export function ChatInterface() {
   const [message, setMessage] = useState("")
@@ -29,8 +30,7 @@ export function ChatInterface() {
     {
       id: 1,
       type: "ai",
-      message:
-        "Xin chào! Tôi là AI Assistant của bạn. Tôi có thể giúp bạn phân tích video, trả lời câu hỏi về nội dung, và đưa ra gợi ý dựa trên sở thích của bạn. Bạn muốn tôi giúp gì?",
+      message: MESSAGES.DEMO.AI_INTRO,
       timestamp: "10:30",
       reactions: [],
     },
@@ -44,8 +44,7 @@ export function ChatInterface() {
     {
       id: 3,
       type: "ai",
-      message:
-        "Deep Learning là một nhánh con của Machine Learning, sử dụng mạng neural nhân tạo với nhiều lớp ẩn để học các đặc trưng phức tạp từ dữ liệu. Dựa trên video bạn vừa xem, tôi có thể thấy bạn quan tâm đến các khái niệm cơ bản. Bạn có muốn tôi gợi ý một số video về Deep Learning phù hợp với trình độ hiện tại không?",
+      message: MESSAGES.DEMO.DEEP_LEARNING_EXPLANATION,
       timestamp: "10:33",
       reactions: [{ type: "like", count: 1 }],
       suggestions: ["Gợi ý video Deep Learning cơ bản", "So sánh ML vs DL", "Ứng dụng thực tế của Deep Learning"],
@@ -60,18 +59,18 @@ export function ChatInterface() {
     {
       id: 5,
       type: "ai",
-      message: "Tuyệt vời! Dựa trên phân tích cảm xúc và sở thích của bạn, tôi đề xuất 3 video phù hợp:",
+      message: MESSAGES.DEMO.VIDEO_SUGGESTIONS,
       timestamp: "10:36",
       reactions: [],
       videoSuggestions: [
         {
-          title: "Deep Learning cho người mới bắt đầu",
+          title: MESSAGES.DEMO.VIDEO_SUGGESTION_1,
           duration: "35:20",
           difficulty: "Cơ bản",
           thumbnail: "/placeholder.svg?height=80&width=120",
         },
         {
-          title: "Neural Networks explained",
+          title: MESSAGES.DEMO.VIDEO_SUGGESTION_2,
           duration: "42:15",
           difficulty: "Trung bình",
           thumbnail: "/placeholder.svg?height=80&width=120",
@@ -85,7 +84,7 @@ export function ChatInterface() {
       id: "ai-assistant",
       name: "AI Assistant",
       type: "ai",
-      lastMessage: "Tôi đề xuất 3 video phù hợp...",
+      lastMessage: MESSAGES.DEMO.VIDEO_SUGGESTIONS,
       timestamp: "10:36",
       unread: 0,
       avatar: "🤖",

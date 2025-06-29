@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS videos (
     file_size INTEGER, -- bytes
     status TEXT DEFAULT 'processing', -- processing, processed, error
     processing_progress INTEGER DEFAULT 0,
+    processing_started_at TEXT,
+    estimated_finish_at TEXT,
     metadata TEXT, -- JSON string for video metadata
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,

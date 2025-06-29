@@ -32,6 +32,12 @@ export default function Home() {
       setUser(JSON.parse(savedUser))
       setIsAuthenticated(true)
     }
+    // Lắng nghe sự kiện chuyển sang "Video của tôi"
+    const handleNavigateToMyVideos = () => setCurrentView('my-videos');
+    window.addEventListener('navigateToMyVideos', handleNavigateToMyVideos);
+    return () => {
+      window.removeEventListener('navigateToMyVideos', handleNavigateToMyVideos);
+    }
   }, [])
 
   const handleAuth = (newToken: string, userData: any) => {
@@ -62,7 +68,7 @@ export default function Home() {
       case "my-videos":
         return <VideoManagement onNavigate={setCurrentView} onSelectVideo={setSelectedVideo} />
       case "add-video":
-        return <AddVideo onBack={() => setCurrentView("dashboard")} onSelectVideo={setSelectedVideo} />
+        return <AddVideo onBack={() => setCurrentView("my-videos")} onSelectVideo={setSelectedVideo} />
       case "chat":
         return <ChatInterface />
       case "profile":

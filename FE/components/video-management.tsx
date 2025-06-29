@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,6 +20,9 @@ import {
   List,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { api } from "@/lib/api"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { useToast } from "@/components/ui/use-toast"
 
 interface VideoManagementProps {
   onNavigate: (view: string) => void
@@ -30,80 +33,32 @@ export function VideoManagement({ onNavigate, onSelectVideo }: VideoManagementPr
   const [searchTerm, setSearchTerm] = useState("")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [filterStatus, setFilterStatus] = useState("all")
+  const [videos, setVideos] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [deleteId, setDeleteId] = useState<string|null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const { toast } = useToast();
 
-  const videos = [
-    {
-      id: 1,
-      title: "Học Machine Learning cơ bản",
-      thumbnail: "/placeholder.svg?height=120&width=200",
-      duration: "45:30",
-      views: 1250,
-      uploadDate: "2024-01-15",
-      status: "processed",
-      aiSummary: "Video giới thiệu các khái niệm cơ bản về ML, bao gồm supervised learning, unsupervised learning...",
-      tags: ["Machine Learning", "AI", "Cơ bản"],
-    },
-    {
-      id: 2,
-      title: "React Hooks Tutorial",
-      thumbnail: "/placeholder.svg?height=120&width=200",
-      duration: "32:15",
-      views: 890,
-      uploadDate: "2024-01-12",
-      status: "processing",
-      aiSummary: "Hướng dẫn sử dụng React Hooks hiệu quả trong các dự án thực tế...",
-      tags: ["React", "JavaScript", "Frontend"],
-    },
-    {
-      id: 3,
-      title: "Python Data Science",
-      thumbnail: "/placeholder.svg?height=120&width=200",
-      duration: "1:12:45",
-      views: 2100,
-      uploadDate: "2024-01-10",
-      status: "processed",
-      aiSummary: "Khóa học Python cho Data Science, từ cơ bản đến nâng cao...",
-      tags: ["Python", "Data Science", "Analytics"],
-    },
-    {
-      id: 4,
-      title: "Next.js App Router",
-      thumbnail: "/placeholder.svg?height=120&width=200",
-      duration: "28:45",
-      views: 756,
-      uploadDate: "2024-01-08",
-      status: "processed",
-      aiSummary: "Tìm hiểu về App Router mới trong Next.js 13+...",
-      tags: ["Next.js", "React", "Web Development"],
-    },
-    {
-      id: 5,
-      title: "Docker cho người mới bắt đầu",
-      thumbnail: "/placeholder.svg?height=120&width=200",
-      duration: "55:20",
-      views: 1420,
-      uploadDate: "2024-01-05",
-      status: "error",
-      aiSummary: "Hướng dẫn Docker từ cơ bản, containerization...",
-      tags: ["Docker", "DevOps", "Container"],
-    },
-    {
-      id: 6,
-      title: "TypeScript Advanced",
-      thumbnail: "/placeholder.svg?height=120&width=200",
-      duration: "1:05:30",
-      views: 980,
-      uploadDate: "2024-01-03",
-      status: "processed",
-      aiSummary: "Các tính năng nâng cao của TypeScript...",
-      tags: ["TypeScript", "JavaScript", "Programming"],
-    },
-  ]
+  useEffect(() => {
+    const fetchVideos = async () => {
+      setLoading(true)
+      try {
+        const token = localStorage.getItem("token") || ""
+        const res = await api.videos.getAll(token)
+        setVideos(res.videos || res.data || res)
+      } catch {
+        setVideos([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchVideos()
+  }, [])
 
   const filteredVideos = videos.filter((video) => {
     const matchesSearch =
       video.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      video.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      video.tags.some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
     const matchesFilter = filterStatus === "all" || video.status === filterStatus
     return matchesSearch && matchesFilter
   })
@@ -131,6 +86,32 @@ export function VideoManagement({ onNavigate, onSelectVideo }: VideoManagementPr
         return "Lỗi"
       default:
         return "Không xác định"
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setDeleting(true)
+    try {
+      const token = localStorage.getItem("token") || ""
+      const res = await api.videos.delete(deleteId, token)
+      setVideos(videos => videos.filter(v => v.id !== deleteId))
+      setDeleteId(null)
+      if (res.driveDeleteError) {
+        toast({
+          title: "Xóa video thành công, nhưng không xóa được file trên Google Drive!",
+          description: res.driveDeleteError,
+          variant: "destructive"
+        })
+      } else {
+        toast({ title: "Xóa video thành công!" })
+      }
+    } catch {
+      // Có thể show toast lỗi ở đây
+      setDeleteId(null)
+      toast({ title: "Xóa video thất bại!", variant: "destructive" })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -270,7 +251,7 @@ export function VideoManagement({ onNavigate, onSelectVideo }: VideoManagementPr
                       <Download className="w-4 h-4 mr-2" />
                       Tải về
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600">
+                    <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(video.id)}>
                       <Trash2 className="w-4 h-4 mr-2" />
                       Xóa
                     </DropdownMenuItem>
@@ -283,12 +264,12 @@ export function VideoManagement({ onNavigate, onSelectVideo }: VideoManagementPr
                 <p className="text-sm text-gray-600 mb-3 line-clamp-2">{video.aiSummary}</p>
 
                 <div className="flex flex-wrap gap-1 mb-3">
-                  {video.tags.slice(0, 2).map((tag, index) => (
+                  {(video.tags?.slice(0, 2) || []).map((tag: string, index: number) => (
                     <Badge key={index} variant="secondary" className="text-xs">
                       {tag}
                     </Badge>
                   ))}
-                  {video.tags.length > 2 && (
+                  {video.tags?.length > 2 && (
                     <Badge variant="secondary" className="text-xs">
                       +{video.tags.length - 2}
                     </Badge>
@@ -298,7 +279,7 @@ export function VideoManagement({ onNavigate, onSelectVideo }: VideoManagementPr
                 <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
                   <span className="flex items-center">
                     <Eye className="w-4 h-4 mr-1" />
-                    {video.views.toLocaleString()}
+                    {Number.isFinite(Number(video.views)) ? Number(video.views).toLocaleString() : '0'}
                   </span>
                   <span className="flex items-center">
                     <Calendar className="w-4 h-4 mr-1" />
@@ -345,7 +326,7 @@ export function VideoManagement({ onNavigate, onSelectVideo }: VideoManagementPr
                       <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
                         <span className="flex items-center">
                           <Eye className="w-4 h-4 mr-1" />
-                          {video.views.toLocaleString()}
+                          {Number.isFinite(Number(video.views)) ? Number(video.views).toLocaleString() : '0'}
                         </span>
                         <span className="flex items-center">
                           <Calendar className="w-4 h-4 mr-1" />
@@ -356,7 +337,7 @@ export function VideoManagement({ onNavigate, onSelectVideo }: VideoManagementPr
                         </Badge>
                       </div>
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {video.tags.map((tag, index) => (
+                        {(video.tags || []).map((tag: string, index: number) => (
                           <Badge key={index} variant="secondary" className="text-xs">
                             {tag}
                           </Badge>
@@ -396,7 +377,7 @@ export function VideoManagement({ onNavigate, onSelectVideo }: VideoManagementPr
                             <Download className="w-4 h-4 mr-2" />
                             Tải về
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
+                          <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(video.id)}>
                             <Trash2 className="w-4 h-4 mr-2" />
                             Xóa
                           </DropdownMenuItem>
@@ -423,6 +404,21 @@ export function VideoManagement({ onNavigate, onSelectVideo }: VideoManagementPr
           </CardContent>
         </Card>
       )}
+
+      {/* Popup xác nhận xóa */}
+      <Dialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bạn có chắc muốn xóa video này?</DialogTitle>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteId(null)} disabled={deleting}>Hủy</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Đang xóa..." : "Xóa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

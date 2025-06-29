@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Home, Video, Plus, MessageCircle, User, Brain, Mic } from "lucide-react"
 
@@ -9,13 +10,28 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentView, onNavigate }: SidebarProps) {
+  const router = useRouter()
+
   const menuItems = [
-    { id: "dashboard", label: "Trang chính", icon: Home },
-    { id: "my-videos", label: "Video của tôi", icon: Video },
-    { id: "add-video", label: "Thêm video", icon: Plus },
-    { id: "chat", label: "Chat AI", icon: MessageCircle },
-    { id: "profile", label: "Cá nhân", icon: User },
+    { id: "dashboard", label: "Trang chính", icon: Home, path: "/" },
+    { id: "my-videos", label: "Video của tôi", icon: Video, path: "/videos" },
+    { id: "add-video", label: "Thêm video", icon: Plus, path: "/add-video" },
+    { id: "chat", label: "Chat AI", icon: MessageCircle, path: "/chat" },
+    { id: "profile", label: "Cá nhân", icon: User, path: "/profile" },
   ]
+
+  const handleNavigation = (item: any) => {
+    if (item.path === "/videos") {
+      // Chuyển hướng đến trang videos
+      router.push("/videos")
+    } else if (item.path === "/") {
+      // Chuyển hướng về trang chính
+      router.push("/")
+    } else {
+      // Các trang khác vẫn sử dụng onNavigate
+      onNavigate(item.id)
+    }
+  }
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -37,7 +53,7 @@ export function Sidebar({ currentView, onNavigate }: SidebarProps) {
               key={item.id}
               variant={currentView === item.id ? "default" : "ghost"}
               className="w-full justify-start"
-              onClick={() => onNavigate(item.id)}
+              onClick={() => handleNavigation(item)}
             >
               <Icon className="w-4 h-4 mr-3" />
               {item.label}

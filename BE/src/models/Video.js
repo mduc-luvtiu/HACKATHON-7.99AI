@@ -3,13 +3,13 @@ const database = require('../database/connection');
 
 class Video {
   static async create(videoData) {
-    const { user_id, title, description, youtube_url, file_url, thumbnail_url, duration, file_size, metadata } = videoData;
+    const { user_id, title, description, youtube_url, file_url, thumbnail_url, duration, file_size, metadata, processing_started_at, estimated_finish_at } = videoData;
     const id = uuidv4();
     
     const result = await database.run(`
-      INSERT INTO videos (id, user_id, title, description, youtube_url, file_url, thumbnail_url, duration, file_size, metadata)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [id, user_id, title, description || null, youtube_url || null, file_url || null, thumbnail_url || null, duration || null, file_size || null, database.stringifyJsonField(metadata)]);
+      INSERT INTO videos (id, user_id, title, description, youtube_url, file_url, thumbnail_url, duration, file_size, metadata, processing_started_at, estimated_finish_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [id, user_id, title, description || null, youtube_url || null, file_url || null, thumbnail_url || null, duration || null, file_size || null, database.stringifyJsonField(metadata), processing_started_at || null, estimated_finish_at || null]);
     
     return this.findById(id);
   }

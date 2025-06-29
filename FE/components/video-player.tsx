@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,6 +25,8 @@ import {
   Users,
   Brain,
 } from "lucide-react"
+import { api } from "@/lib/api"
+import { Progress } from "@/components/ui/progress"
 
 interface VideoPlayerProps {
   video: any
@@ -36,7 +38,34 @@ function extractYouTubeId(url: string) {
   return match ? match[1] : "";
 }
 
-export function VideoPlayer({ video, onBack }: VideoPlayerProps) {
+// Hàm chuyển đổi Google Drive URL thành direct link
+function getGoogleDriveDirectUrl(url: string): string {
+  // Nếu là Google Drive sharing URL
+  if (url.includes('drive.google.com/file/d/')) {
+    const fileId = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+    if (fileId) {
+      // Sử dụng export=preview để phát trực tiếp
+      // return `https://drive.google.com/uc?export=preview&id=${fileId}`;
+      return `https://drive.google.com/file/d/${fileId}/preview`
+    }
+  }
+  // Nếu là direct URL với id
+  if (url.includes('uc?export=download') || url.includes('uc?export=preview')) {
+    // Đảm bảo dùng export=preview
+    return url.replace('export=download', 'export=preview');
+  }
+  // Nếu là Google Drive view URL
+  if (url.includes('drive.google.com/open?id=')) {
+    const fileId = url.match(/id=([a-zA-Z0-9-_]+)/)?.[1];
+    if (fileId) {
+      return `https://drive.google.com/uc?export=preview&id=${fileId}`;
+    }
+  }
+  return url;
+}
+
+export function VideoPlayer({ video: initialVideo, onBack }: VideoPlayerProps) {
+  const [video, setVideo] = useState(initialVideo)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(180) // 3 minutes for demo
@@ -46,6 +75,22 @@ export function VideoPlayer({ video, onBack }: VideoPlayerProps) {
   const [showSummary, setShowSummary] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
+
+  // Polling trạng thái video
+  useEffect(() => {
+    if (!video?.id || video.status === 'processed') return;
+    const token = localStorage.getItem('token') || '';
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.videos.getStatus(video.id, token)
+        if (res?.video?.status === 'processed') {
+          setVideo((v: any) => ({ ...v, status: 'processed' }))
+          clearInterval(interval)
+        }
+      } catch {}
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [video?.id, video?.status])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -91,6 +136,31 @@ export function VideoPlayer({ video, onBack }: VideoPlayerProps) {
       alert('Tải xuống thất bại!');
     }
   };
+
+ //
+  
+  // Xác định video source //bug j o da
+  const getVideoSource = () => {
+    if (video?.type === "youtube") {
+      return null; // Sẽ render iframe riêng
+    }
+    if (video?.file_url) {
+      return getGoogleDriveDirectUrl(video.file_url);
+    }
+    if (video?.type === "local") {
+      return video.file_url
+    }
+    
+    // Fallback về API stream
+    if (video?.id) {
+      return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/videos/${video.id}/stream?token=${localStorage.getItem('token') || ''}`;
+    }
+    //cho no chieu len do
+    return null;
+  };
+
+  const videoSource = getVideoSource();
+  console.log(video)
 
   if (video?.type === "youtube") {
     const videoId = extractYouTubeId(video.url);
@@ -140,11 +210,11 @@ export function VideoPlayer({ video, onBack }: VideoPlayerProps) {
             <Heart className="w-4 h-4 mr-2" />
             Yêu thích
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" disabled={video.status !== 'processed'}>
             <Share className="w-4 h-4 mr-2" />
             Chia sẻ
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" disabled={video.status !== 'processed'}>
             <Download className="w-4 h-4 mr-2" />
             Tải về
           </Button>
@@ -157,68 +227,144 @@ export function VideoPlayer({ video, onBack }: VideoPlayerProps) {
           <Card>
             <CardContent className="p-0">
               <div className="relative bg-black rounded-lg overflow-hidden">
-                <video ref={videoRef} className="w-full aspect-video" poster={video?.thumbnail}>
-                  <source src="/placeholder-video.mp4" type="video/mp4" />
-                </video>
+                {video.status==="processing" && video.processing_progress === 0 && !videoSource ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-lg text-gray-500 w-full">
+                    <Progress value={video.processing_progress || 0} className="w-1/2 mb-4" />
+                    <div>
+                      Đang xử lý... {video.processing_progress ? `${video.processing_progress}%` : ""}
+                    </div>
+                    <div className="text-sm mt-2">
+                      {video.processing_started_at && (
+                        <span>Bắt đầu lúc: {new Date(video.processing_started_at).toLocaleTimeString()}</span>
+                      )}
+                      {video.estimated_finish_at && (
+                        <span> - Ước tính xong lúc: {new Date(video.estimated_finish_at).toLocaleTimeString()}</span>
+                      )}
+                    </div>
+                  </div>
+                ) : videoSource ? (
+                  videoSource.includes('drive.google.com') ? (
+                    <iframe
+                      src={videoSource}
+                      className="w-full aspect-video"
+                      allow="autoplay"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video 
+                      ref={videoRef} 
+                      className="w-full aspect-video" 
+                      poster={video?.thumbnail_url || video?.thumbnail} 
+                      controls
+                      onLoadedMetadata={() => {
+                        if (videoRef.current) {
+                          setDuration(videoRef.current.duration);
+                        }
+                      }}
+                      onTimeUpdate={() => {
+                        if (videoRef.current) {
+                          setCurrentTime(videoRef.current.currentTime);
+                        }
+                      }}
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                    >
+                      <source src={videoSource} type="video/mp4" />
+                      <source src={videoSource} type="video/webm" />
+                      <source src={videoSource} type="video/ogg" />
+                      Trình duyệt của bạn không hỗ trợ video.
+                    </video>
+                  )
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-64 text-lg text-gray-500 w-full">
+                    <div>Không thể phát video</div>
+                    <div className="text-sm mt-2">URL video không hợp lệ hoặc không có quyền truy cập</div>
+                  </div>
+                )}
 
                 {/* Video Controls */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                  <div className="space-y-2">
-                    {/* Progress Bar */}
-                    <Slider
-                      value={[currentTime]}
-                      max={duration}
-                      step={1}
-                      className="w-full"
-                      onValueChange={(value) => setCurrentTime(value[0])}
-                    />
+                {!videoSource?.includes('drive.google.com') && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                    <div className="space-y-2">
+                      {/* Progress Bar */}
+                      <Slider
+                        value={[currentTime]}
+                        max={duration}
+                        step={1}
+                        className="w-full"
+                        onValueChange={(value) => {
+                          setCurrentTime(value[0]);
+                          if (videoRef.current) {
+                            videoRef.current.currentTime = value[0];
+                          }
+                        }}
+                      />
 
-                    {/* Controls */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-white hover:bg-white/20"
-                          onClick={() => setIsPlaying(!isPlaying)}
-                        >
-                          {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                        </Button>
-
+                      {/* Controls */}
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <Button
                             size="sm"
                             variant="ghost"
                             className="text-white hover:bg-white/20"
-                            onClick={() => setIsMuted(!isMuted)}
+                            onClick={() => {
+                              if (videoRef.current) {
+                                if (isPlaying) {
+                                  videoRef.current.pause();
+                                } else {
+                                  videoRef.current.play();
+                                }
+                              }
+                            }}
                           >
-                            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                           </Button>
-                          <Slider
-                            value={[volume]}
-                            max={100}
-                            step={1}
-                            className="w-20"
-                            onValueChange={(value) => setVolume(value[0])}
-                          />
+
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-white hover:bg-white/20"
+                              onClick={() => {
+                                if (videoRef.current) {
+                                  videoRef.current.muted = !isMuted;
+                                  setIsMuted(!isMuted);
+                                }
+                              }}
+                            >
+                              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                            </Button>
+                            <Slider
+                              value={[volume]}
+                              max={100}
+                              step={1}
+                              className="w-20"
+                              onValueChange={(value) => {
+                                setVolume(value[0]);
+                                if (videoRef.current) {
+                                  videoRef.current.volume = value[0] / 100;
+                                }
+                              }}
+                            />
+                          </div>
+
+                          <span className="text-white text-sm">
+                            {formatTime(currentTime)} / {formatTime(duration)}
+                          </span>
                         </div>
 
-                        <span className="text-white text-sm">
-                          {formatTime(currentTime)} / {formatTime(duration)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Button size="sm" variant="ghost" className="text-white hover:bg-white/20">
-                          <Settings className="w-4 h-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" className="text-white hover:bg-white/20">
-                          <Maximize className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center space-x-2">
+                          <Button size="sm" variant="ghost" className="text-white hover:bg-white/20">
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-white hover:bg-white/20">
+                            <Maximize className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -312,15 +458,14 @@ export function VideoPlayer({ video, onBack }: VideoPlayerProps) {
                     </div>
                     <div className="bg-gray-100 p-3 rounded-lg">
                       <p className="text-sm">
-                        Machine Learning là một nhánh của AI, tập trung vào việc máy tính học từ dữ liệu mà không cần
-                        lập trình cụ thể...
+                        Machine Learning là một tập con của AI, tập trung vào việc dạy máy tính học từ dữ liệu mà không cần lập trình rõ ràng.
                       </p>
                     </div>
                   </div>
                   <div className="mt-4 flex space-x-2">
                     <input
                       type="text"
-                      placeholder="Hỏi về video..."
+                      placeholder="Nhập câu hỏi..."
                       className="flex-1 px-3 py-2 border rounded-lg text-sm"
                     />
                     <Button size="sm">Gửi</Button>
@@ -336,20 +481,12 @@ export function VideoPlayer({ video, onBack }: VideoPlayerProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {aiSummary.timestamps.map((item, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                        onClick={() =>
-                          setCurrentTime(
-                            Number.parseInt(item.time.split(":")[0]) * 60 + Number.parseInt(item.time.split(":")[1]),
-                          )
-                        }
-                      >
-                        <Badge variant="outline" className="text-xs">
-                          {item.time}
-                        </Badge>
-                        <p className="text-sm text-gray-600 flex-1">{item.content}</p>
+                    {aiSummary.timestamps.map((timestamp, idx) => (
+                      <div key={idx} className="flex items-start space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <span className="text-sm font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                          {timestamp.time}
+                        </span>
+                        <span className="text-sm text-gray-700">{timestamp.content}</span>
                       </div>
                     ))}
                   </div>
@@ -357,15 +494,6 @@ export function VideoPlayer({ video, onBack }: VideoPlayerProps) {
               </Card>
             </TabsContent>
           </Tabs>
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold">Thuyết minh AI</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-base text-gray-600">Tải xuống toàn bộ nội dung thuyết minh (transcript) của video này để đọc lại hoặc chia sẻ.</p>
-              <Button className="text-base font-semibold">Tải xuống thuyết minh</Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

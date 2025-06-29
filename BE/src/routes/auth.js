@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
+const multer = require('multer');
+const path = require('path');
 
 const router = express.Router();
 
@@ -322,6 +324,32 @@ router.post('/logout', auth, async (req, res) => {
       success: false,
       message: 'Internal server error'
     });
+  }
+});
+
+// Multer config for avatar upload
+const avatarStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, '../../uploads/avatar'));
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    cb(null, req.user.userId + '_' + Date.now() + ext);
+  }
+});
+const uploadAvatar = multer({ storage: avatarStorage });
+
+// Update avatar
+router.put('/avatar', auth, uploadAvatar.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    const avatarUrl = `/uploads/avatar/${req.file.filename}`;
+    await User.update(req.user.userId, { avatar_url: avatarUrl });
+    res.json({ success: true, message: 'Avatar updated', data: { avatar_url: avatarUrl } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

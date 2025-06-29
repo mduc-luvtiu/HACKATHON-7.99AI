@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,6 +24,7 @@ import {
   TrendingUp,
 } from "lucide-react"
 import { api } from "@/lib/api"
+import { MESSAGES } from "@/lib/messages"
 
 interface ProfileProps {
   user: any
@@ -44,12 +45,15 @@ export function Profile({ user, onLogout }: ProfileProps) {
   const [bio, setBio] = useState(user?.bio || "")
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || "")
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Nếu user thay đổi (do login/logout), cập nhật lại form
   useEffect(() => {
     setFullName(user?.full_name || "")
     setEmail(user?.email || "")
     setBio(user?.bio || "")
+    setAvatarUrl(user?.avatar_url || "")
   }, [user])
 
   // Lưu thay đổi
@@ -59,18 +63,41 @@ export function Profile({ user, onLogout }: ProfileProps) {
     try {
       // Lấy token từ localStorage
       const token = localStorage.getItem('token')
-      if (!token) throw new Error("Chưa đăng nhập")
+      if (!token) throw new Error(MESSAGES.AUTH.NOT_LOGGED_IN)
       // Gọi API cập nhật
       await api.auth.updateProfile(token, {
         full_name: fullName,
         email,
         bio,
       })
-      setMessage("Cập nhật thành công!")
+      setMessage(MESSAGES.USER.PROFILE_UPDATED)
     } catch (err: any) {
-      setMessage(err.message || "Cập nhật thất bại!")
+      setMessage(err.message || MESSAGES.USER.PROFILE_UPDATE_FAILED)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]  
+    if (!file) return
+    const formData = new FormData()
+    formData.append('avatar', file)
+    const token = localStorage.getItem('token')
+    try {
+      const res = await fetch('/api/auth/avatar', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      })
+      const data = await res.json()
+      if (data.success) {
+        setAvatarUrl(data.data.avatar_url)
+      } else {
+        alert(data.message || MESSAGES.USER.AVATAR_UPDATE_FAILED)
+      }
+    } catch {
+      alert(MESSAGES.USER.AVATAR_UPDATE_FAILED)
     }
   }
 
@@ -117,8 +144,26 @@ export function Profile({ user, onLogout }: ProfileProps) {
         <div className="lg:col-span-1 space-y-6">
           <Card>
             <CardContent className="p-6 text-center">
-              <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <User className="w-12 h-12 text-white" />
+              <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 relative group">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="avatar" className="w-24 h-24 rounded-full object-cover" />
+                ) : (
+                  <User className="w-12 h-12 text-white" />
+                )}
+                <button
+                  className="absolute bottom-0 right-0 bg-white rounded-full p-1 shadow group-hover:scale-110 transition"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Đổi avatar"
+                >
+                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536M9 11l6 6M3 21h18" /></svg>
+                </button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleAvatarChange}
+                />
               </div>
               <h2 className="text-xl font-bold text-gray-900">{user?.full_name || "Chưa có tên"}</h2>
               <p className="text-gray-600">{user?.email || "Chưa có email"}</p>
@@ -294,7 +339,7 @@ export function Profile({ user, onLogout }: ProfileProps) {
                   </div>
                   <Button variant="outline" className="w-full mt-4 bg-transparent">
                     <Download className="w-4 h-4 mr-2" />
-                    Tải xuất dữ liệu
+                    Tải xuống dữ liệu
                   </Button>
                 </CardContent>
               </Card>

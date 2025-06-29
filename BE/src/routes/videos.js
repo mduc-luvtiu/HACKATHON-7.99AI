@@ -4,6 +4,8 @@ const { body, validationResult, query } = require('express-validator');
 const Video = require('../models/Video');
 const videoService = require('../services/videoService');
 const { auth, checkSubscription } = require('../middleware/auth');
+const path = require('path');
+const { uploadFileToDrive } = require('../services/googleDriveService');
 
 const router = express.Router();
 
@@ -40,6 +42,18 @@ const upload = multer({
     }
   }
 });
+
+// Multer config for video upload
+const videoStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, '../../uploads/videos'));
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    cb(null, req.user.userId + '_' + Date.now() + ext);
+  }
+});
+const uploadVideo = multer({ storage: videoStorage });
 
 // Get all videos (with pagination and filters)
 router.get('/', auth, [
@@ -125,55 +139,39 @@ router.get('/:id', auth, async (req, res) => {
   }
 });
 
-// Upload video file
-router.post('/upload', auth, checkSubscription('video_upload'), upload.single('video'), [
-  body('title').trim().isLength({ min: 1, max: 500 }),
-  body('description').optional().trim().isLength({ max: 2000 })
-], async (req, res) => {
+// Upload video
+router.post('/upload', auth, uploadVideo.single('file'), async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
-
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No video file provided'
-      });
+      return res.status(400).json({ success: false, message: 'Không có file được upload.' });
     }
-
     const { title, description } = req.body;
+    const localPath = req.file.path;
+    const fileName = req.file.originalname;
 
-    const result = await videoService.processUploadedVideo(req.file, {
+    // Upload lên Google Drive
+    const driveRes = await uploadFileToDrive(localPath, fileName);
+
+    // Lưu vào DB: file_url là driveRes.webViewLink
+    const video = await Video.create({
+      user_id: req.user.id,
       title,
-      description
-    }, req.user.id);
+      description,
+      file_url: driveRes.webViewLink,
+      file_size: req.file.size,
+      status: 'processing'
+    });
 
-    res.status(201).json({
+    // Tạo job xử lý video (nếu có)
+    const job = await Video.createProcessingJob(video.id, 'process');
+    res.json({
       success: true,
-      message: 'Video uploaded successfully',
-      data: result
+      message: 'Tải video thành công!',
+      data: { video, jobId: job.id }
     });
-  } catch (error) {
-    console.error('Video upload error:', error);
-    
-    // Clean up uploaded file if processing failed
-    if (req.file && req.file.path) {
-      const fs = require('fs');
-      if (fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
-    }
-
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Internal server error'
-    });
+  } catch (err) {
+    console.error('Upload error:', err);
+    res.status(500).json({ success: false, message: 'Tải video thất bại! Lỗi hệ thống hoặc Google Drive.' });
   }
 });
 
@@ -331,7 +329,9 @@ router.get('/:id/status', auth, async (req, res) => {
           id: video.id,
           title: video.title,
           status: video.status,
-          processing_progress: video.processing_progress
+          processing_progress: video.processing_progress,
+          processing_started_at: video.processing_started_at,
+          estimated_finish_at: video.estimated_finish_at
         },
         jobs
       }

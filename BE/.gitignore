@@ -1,6 +1,6 @@
 # Node.js
 node_modules/
-
+gdrive-service-account.json
 # Logs
 logs
 *.log
@@ -24,3 +24,8 @@ logs
 
 # Environment variables
 .env*
+BE/gdrive-service-account.json
+BE/.env
+gdrive-service-account.json
+.gdrive-service-account.json
+*gdrive-service-account.json

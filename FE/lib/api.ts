@@ -93,17 +93,31 @@ export const api = {
       return handleResponse(response);
     },
     upload: async (file: File, title: string, description: string, token: string) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('title', title);
-      formData.append('description', description);
-      
-      const response = await fetch(`${API_BASE_URL}/api/videos/upload`, {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('title', title);
+      form.append('description', description);
+      const res = await fetch(`${API_BASE_URL}/api/videos/upload`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: form
       });
-      
+      if (!res.ok) throw new Error((await res.json()).message || 'Upload failed');
+      return res.json();
+    },
+    delete: async (id: string, token: string) => {
+      const response = await fetch(`${API_BASE_URL}/api/videos/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      return handleResponse(response);
+    },
+    getStatus: async (id: string, token: string) => {
+      const response = await fetch(`${API_BASE_URL}/api/videos/${id}/status`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
       return handleResponse(response);
     },
   },
